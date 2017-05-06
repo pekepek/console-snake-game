@@ -1,48 +1,33 @@
 require 'tty'
 require 'console_snake/version'
+require 'console_snake/background'
+require 'pry'
 
 class ConsoleSnake
   class << self
     def start
-      @direction = 'C'
-
-      tate, yoko = IO.console.winsize.map {|i| i + 1 }
-      @position = {x: yoko / 2, y: tate / 2}
+      console_vertical, console_horizontal = IO.console.winsize.map {|s| s - 1 }
+      @background = ConsoleSnake::Background.new(console_vertical, console_horizontal)
 
       Thread.new do
-        move_cursor
+        move_snake
       end
 
       loop do
-        print "\e[2J"
-        print "\e[#{@position[:y]};#{@position[:x]}H"
+        @background.move!
 
-        case @direction
-        when 'A'
-          @position[:y] -= 1
-        when 'B'
-          @position[:y] += 1
-        when 'C'
-          @position[:x] += 2
-        when 'D'
-          @position[:x] -= 2
-        end
+        exit if @background.position[:y] < 0 || console_vertical < @background.position[:y]
+        exit if @background.position[:x] < 0 || console_horizontal < @background.position[:x]
 
-        if /A|B/ === @direction
-          exit if @position[:y] < 0 || tate < @position[:y]
-        else
-          exit if @position[:x] < 0 || yoko < @position[:x]
-        end
+        @background.pretty_print
 
-        print '[]'
-
-        sleep 0.05
+        sleep 0.5
       end
     end
 
     private
 
-    def move_cursor
+    def move_snake
       while key = STDIN.getch
         # NOTE enable to cancel a game by ctrl-c
         exit if key == "\C-c"
@@ -50,25 +35,9 @@ class ConsoleSnake
         if key == "\e" && STDIN.getch == "["
           key = STDIN.getch
 
-          next if /A|B/ === @direction && /A|B/ === key
-          next if /C|D/ === @direction && /C|D/ === key
+          next unless /A|B|C|D/ === key
 
-          @direction = key
-        end
-      end
-    end
-
-    def print_block
-      piece = '[]'
-
-      if /C|D/ === @direction
-        print piece * 4
-        print "\e[8D"
-      else
-        4.times do
-          print piece
-          print "\e[2D"
-          print "\e[B"
+          @background.turn!(key)
         end
       end
     end
